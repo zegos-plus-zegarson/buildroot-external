@@ -1,0 +1,15 @@
+services:
+  ubuntu-buildroot:
+    image: ubuntu-buildroot/frankoslaw:v1.0.5
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    stdin_open: true
+    tty: true
+    network_mode: host
+    volumes:
+      - ./:/root/buildroot-external
+      - ../buildroot:/root/buildroot
+      - ${HOME}/.buildroot-ccache:/root/.buildroot-ccache
+    environment:
+      BR2_EXTERNAL: /root/buildroot-external

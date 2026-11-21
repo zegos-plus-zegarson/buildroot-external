@@ -1,0 +1,4 @@
+# Network loading from the U-Boot command line.
+CONFIG_CMD_TFTPBOOT=y
+CONFIG_CMD_DHCP=y
+
