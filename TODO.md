@@ -1,0 +1,28 @@
+TODO:
+- [ ] RAUC OTA
+- [ ] Separate readonly squashfs os base from writable user data
+- [ ] Games
+- [ ] QEMU virtual arm board for user space testing
+- [ ] Better automation
+    - [ ] Less flaky tftp/nfs setup that isn't dependent on router settings
+    - [ ] Tftp setup directly through connection laptop <-> devboard
+        - [ ] Ensure that it does not break networking
+- [ ] Add touchscreen support
+- [ ] Move uboot to nand (can be in both nand and sd card image) but set boot option to nand as uboot already handles boot fallbacks
+- [ ] Separate image gen for sdcard based boot and nand based
+- [ ] Update script to auto include boot-fallback scr to the board
+    - [ ] Automate initial setenv setup through dev setting in zig launcher and setenv on rust daemon side
+- [ ] Add zig based launcher
+    - [ ] Support for nested apps like mpv, quake
+- [ ] Add dbus daemons
+    - [ ] IWD
+    - [ ] Rauc
+- [ ] Support KMS as well as Weston/Cage
+- [ ] Unify old legacy zegarson builds with new chiliboard tree
+- [ ] Add xbox one controller support over usb
+- [ ] Add x11 forwarding or other mean of seeing video over ethernet rather than SPI display
+- [ ] Add SSH daemon
+- [ ] Applets
+    - [ ] Clock
+    - [ ] Weather
+    - [ ] Steps
