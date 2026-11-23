@@ -1,0 +1,13 @@
+# The board's default map reserves 0x1c0000 and 0x1e0000 for redundant env.
+CONFIG_ENV_IS_IN_NAND=y
+# CONFIG_ENV_IS_IN_MMC is not set
+CONFIG_ENV_OFFSET=0x1c0000
+CONFIG_ENV_OFFSET_REDUND=0x1e0000
+CONFIG_ENV_SIZE=0x2000
+CONFIG_ENV_RANGE=0x20000
+CONFIG_CMD_NAND_TRIMFFS=y
+# The complete recovery boot sequence exceeds the board's 1024-byte default.
+CONFIG_SYS_CBSIZE=2048
+# Keep the recovery path in compiled U-Boot so it works without an SD card.
+# The NAND installer SD card has flash inputs, not an OS root partition.
+CONFIG_BOOTCOMMAND="setenv console ttyS0; if test x${nfsroot} = x; then setenv nfsroot /srv/zegos/rootfs; fi; if test x${fallback_delay} = x; then setenv fallback_delay 2; fi; setenv netretry no; setenv tftptimeout 2000; setenv tftptimeoutcountmax 3; if test x${disable_tftp} != x1; then echo [BOOT] Trying TFTP; setenv autoload no; if dhcp; then setenv autoload; if tftpboot ${loadaddr} zegos/zImage && tftpboot ${fdt_addr} zegos/${fdt_file} && run netargs; then setenv bootargs ${bootargs} rw; bootz ${loadaddr} - ${fdt_addr}; fi; fi; setenv autoload; echo [BOOT] TFTP failed; fi; if test x${disable_sd} != x1; then sleep ${fallback_delay}; echo [BOOT] Trying SD slot A; if mmc dev 0 && mmc rescan && fatload mmc 0:1 ${loadaddr} zImage && fatload mmc 0:1 ${fdt_addr} ${fdt_file} && run mmcargs; then bootz ${loadaddr} - ${fdt_addr}; fi; echo [BOOT] SD slot A failed; fi; if test x${disable_nand} != x1; then sleep ${fallback_delay}; echo [BOOT] Trying NAND recovery; setenv console ttyS0,${baudrate}; if mtdparts default && nand read ${fdt_addr} NAND.u-boot-spl-os && nand read ${loadaddr} NAND.kernel && run nandargs; then bootz ${loadaddr} - ${fdt_addr}; fi; echo [BOOT] NAND recovery failed; fi; echo [BOOT] All enabled boot sources failed; entering U-Boot prompt; false"

@@ -9,44 +9,140 @@ Tested board: AM3352, 256 MiB RAM, 256 MiB NAND.
 | U-Boot | 2024.10 |
 | Toolchain | Bootlin ARMv7 hard-float glibc stable (x86_64 host) |
 
-## Build
+## SD card (4 GB)
+
+### Build
 
 From `buildroot-external`, clone Buildroot beside it if needed:
 
 ```sh
 git clone --depth 1 --branch 2026.08.x https://gitlab.com/buildroot.org/buildroot.git ../buildroot
 docker compose build
-docker compose run --rm ubuntu-buildroot make zegos_chiliboard_defconfig
-docker compose run --rm ubuntu-buildroot sh -c 'make -j"$(nproc)"'
+docker compose run --rm ubuntu-buildroot make O=output-sd-4gb zegos_chiliboard_sd_4gb_defconfig
+docker compose run --rm ubuntu-buildroot sh -c 'make O=output-sd-4gb -j"$(nproc)"'
 ```
 
-If `../buildroot/output` was built with another toolchain, run
-`docker compose run --rm ubuntu-buildroot make clean` before configuring.
+Keep separate output directories for SD, NAND, and NFS. If an output directory
+was built with another toolchain, clean that output before reconfiguring it.
 
-Images: `../buildroot/output/images/sdcard.img` (sparse) and
-`sdcard.img.bmap`. The disk image has a 16 MiB FAT boot partition and a
-128 MiB ext4 root partition; it fits an 8 GB microSD card.
+Output: `../buildroot/output-sd-4gb/images/sdcard.img` (sparse) and
+`sdcard.img.bmap`. The MBR image targets a nominal 4 GB microSD card:
 
-## Flash
+| Partition | Size | Contents |
+| --- | ---: | --- |
+| 1: boot | 16 MiB | MLO, U-Boot, kernel, DTB, `boot.scr` |
+| 2: rootfs A | 1430 MiB (~1.5 GB) | Booted ext4 root filesystem |
+| 3: rootfs B | 1430 MiB (~1.5 GB) | Initial copy of A; no slot switch yet |
+| 4: userdata | 925 MiB (~0.97 GB) | Empty ext4 filesystem |
+
+Check the card's actual capacity before flashing. Both root partitions are
+populated, but U-Boot boots only partition 2. The post-image script generates
+`boot.scr` from `board/chiliboard/boot-fallback.cmd` and includes it in the
+boot partition.
+
+### Flash
 
 Set `SD_DEVICE` to the **whole card device**:
 
 ```sh
 SD_DEVICE=/dev/sdX
 docker run --rm --device="$SD_DEVICE" \
-    -v "$(cd ../buildroot && pwd)/output/images:/images:ro" \
+    -v "$(cd ../buildroot && pwd)/output-sd-4gb/images:/images:ro" \
     ubuntu-buildroot/frankoslaw:v1.0.5 \
     bmaptool copy --bmap /images/sdcard.img.bmap /images/sdcard.img "$SD_DEVICE"
 ```
 
-## Boot
+### Boot
+
+Select SD boot and power cycle. U-Boot loads `boot.scr` from partition 1; the
+script tries TFTP/NFS, SD rootfs A, then NAND recovery. If every target fails,
+it prints an error and returns to the U-Boot prompt.
+
+## Serial console
 
 Serial console: 115200 8N1 through the micro USB debug port.
+Run `./scripts/serial-console.sh` to open `/dev/ttyUSB0` with picocom and
+reconnect when the device appears again.
+
+## NAND recovery (256 MiB)
+
+The NAND variant installs a recovery system in on-board NAND. Its compiled
+U-Boot command tries TFTP/NFS, SD slot A, then NAND recovery. The NAND
+installer is an SD card image used to program NAND; it has no SD root
+filesystem.
+
+### Build
+
+Use a separate output directory:
+
+```sh
+docker compose run --rm ubuntu-buildroot make O=output-nand zegos_chiliboard_nand_defconfig
+docker compose run --rm ubuntu-buildroot sh -c 'make O=output-nand -j"$(nproc)"'
+```
+
+Output: `../buildroot/output-nand/images/nand-installer.img`. The installer
+contains a 16 MiB FAT boot partition with `MLO`, `u-boot.img`, and
+`flash-nand.scr`, plus a FAT32 payload partition with the DTB, kernel, and
+`rootfs.ubi` under `nand/`. The image-generation script checks that each
+artifact fits its NAND partition; `rootfs.ubi` is limited to 240 MiB.
+
+### NAND layout
+
+| Offset | Size | MTD partition | Contents |
+| ---: | ---: | --- | --- |
+| 0x000000 | 4 × 128 KiB | `NAND.SPL` and backups 1–3 | SPL copies |
+| 0x080000 | 256 KiB | `NAND.u-boot-spl-os` | Device tree |
+| 0x0c0000 | 1 MiB | `NAND.u-boot` | U-Boot |
+| 0x1c0000 | 2 × 128 KiB | `NAND.u-boot-env` and backup 1 | Redundant environment |
+| 0x200000 | 8 MiB | `NAND.kernel` | Kernel |
+| 0xa00000 | 246 MiB | `NAND.file-system` | UBI/UBIFS recovery root |
+
+These offsets match the chiliBoard U-Boot partition map and the NAND Linux
+device tree. The UBI image uses a 128 KiB eraseblock, 2 KiB page, 512-byte
+subpage, and 129024-byte logical eraseblock. The U-Boot build includes the
+SPL NAND page-size fix needed to load U-Boot from NAND.
+
+### Install
+
+Flash the installer image to a **whole SD card device**. This overwrites the
+card:
+
+```sh
+sudo dd if=../buildroot/output-nand/images/nand-installer.img of=/dev/sdX bs=4M conv=fsync status=progress
+```
+
+Insert the card, select SD boot, power cycle, and interrupt U-Boot. At the
+U-Boot prompt:
+
+```text
+load mmc 0:1 0x81000000 flash-nand.scr
+source 0x81000000
+```
+
+`flash-nand.scr` checks its inputs, writes the bootloader, DTB, kernel, and
+UBI image through U-Boot's NAND driver, then erases both environment copies.
+The UBI write uses `nand write.trimffs` so trailing erased pages remain
+unwritten. It prints `[FLASH] NAND recovery written` on success. Do not write
+the installer image directly to NAND.
+
+### Boot and validation
+
+Remove the installer card, select NAND-first `SYSBOOT[4:0]=10100`, and fully
+power cycle. This setting boots NAND first, followed by NAND I2C, SPI0, and
+EMAC1. The boot pins are latched at power-on. At the U-Boot prompt,
+`md.l 44e10040 1` shows the latched value; its low five bits should be
+`0x14` for this setting.
+
+Confirmed on the tested board: NAND SPL loads U-Boot, U-Boot falls through to
+NAND recovery without an SD card, and Linux reaches the Buildroot login
+prompt. Before relying on recovery, verify repeated NAND-only cold boots for
+UBI/ECC errors and test NAND with bad blocks. The installer card has no SD
+slot A kernel, so its SD attempt should fall through to NAND recovery.
 
 ## TFTP kernel and NFS root
 
-The SD card still boots MLO and U-Boot. U-Boot loads the kernel and DTB from
-TFTP, then Linux mounts `/srv/zegos/rootfs` from the workstation over NFS.
+The SD card boots MLO and U-Boot. Its generated `boot.scr` can load the kernel
+and DTB from TFTP; Linux then mounts `/srv/zegos/rootfs` over NFS.
 
 ### Build
 
@@ -109,31 +205,39 @@ Deploy the kernel, DTB, and root filesystem while the board is off:
 ./scripts/deploy-netboot.sh
 ```
 
-Copy `../buildroot/output-nfs/images/boot.scr` to the SD card's FAT boot
-partition. At the U-Boot prompt, set the workstation address and boot command
-once:
+`boot.scr` is included in the SD image, and that build of U-Boot runs it by
+default. For NFS boot, set the workstation address once at the U-Boot prompt:
 
 ```text
 setenv serverip 192.168.0.11
-setenv scriptaddr 0x81000000
-setenv bootcmd 'if load mmc 0:1 ${scriptaddr} boot.scr; then source ${scriptaddr}; else run mmcboot; run nandboot; fi'
 saveenv
 run bootcmd
 ```
 
+If this card already has an older saved U-Boot environment, reset its boot
+command to the new compiled default before `saveenv`:
+
+```text
+env default -f bootcmd
+saveenv
+```
+
 `board/chiliboard/boot-fallback.cmd` tries TFTP, SD, then NAND. Set
 `disable_tftp`, `disable_sd`, or `disable_nand` to `1` and run `saveenv` to skip
-a target. NAND starts disabled because this project does not build a NAND
-image. `fallback_delay` controls the wait before SD and NAND. U-Boot can fall
-back after a download or `bootz` failure; it cannot detect a failure after
-Linux starts.
+a target. NAND recovery is enabled by default; it will simply fail if no
+recovery image has been flashed yet. If an older saved environment has
+`disable_nand=1`, use `setenv disable_nand 0; saveenv` to enable it.
+`fallback_delay` controls the wait before SD and NAND.
+U-Boot can fall back after a download or `bootz` failure; it cannot detect a
+failure after Linux starts.
 
 For each kernel or rootfs change, rebuild, run `deploy-netboot.sh`, and
-reboot. If `boot-fallback.cmd` changes, regenerate `boot.scr` and copy it to
-the SD boot partition:
+reboot. If `boot-fallback.cmd` changes, rebuild the SD image and reflash the
+card, or copy `output-sd-4gb/images/boot.scr` to its FAT boot partition after
+the SD image build:
 
 ```sh
-docker compose run --rm ubuntu-buildroot make O=output-nfs host-uboot-tools-rebuild
+docker compose run --rm ubuntu-buildroot sh -c 'make O=output-sd-4gb -j"$(nproc)"'
 ```
 
 `/srv/zegos/rootfs` on the workstation is `/` on the board. Deployment uses

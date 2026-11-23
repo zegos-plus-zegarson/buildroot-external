@@ -1,0 +1,3 @@
+# Automatically run the boot script packaged in the SD FAT partition.
+# Use a fixed address so a saved scriptaddr environment variable is unnecessary.
+CONFIG_BOOTCOMMAND="if load mmc 0:1 0x81000000 boot.scr; then source 0x81000000; else run mmcboot; mtdparts default; run nandboot; echo [BOOT] Recovery failed; entering U-Boot prompt; false; fi"

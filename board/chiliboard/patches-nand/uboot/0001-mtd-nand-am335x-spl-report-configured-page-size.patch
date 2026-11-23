@@ -1,0 +1,22 @@
+Subject: [PATCH] mtd: nand: am335x: report configured page size in SPL
+
+The legacy AM335x SPL NAND reader does not run nand_scan(), so the
+private mtd_info writesize remains zero. spl_nand_read() uses
+nand_page_size() to set its block length after reading the image header.
+A zero block length causes the generic SPL loader's aligned payload read
+to fail even when U-Boot was written at the correct NAND offset.
+
+This driver already uses CONFIG_SYS_NAND_PAGE_SIZE for all page reads;
+return the same configured size to the generic SPL loader.
+
+---
+--- a/drivers/mtd/nand/raw/am335x_spl_bch.c
++++ b/drivers/mtd/nand/raw/am335x_spl_bch.c
+@@ -219,6 +219,6 @@
+ unsigned int nand_page_size(void)
+ {
+-	return nand_to_mtd(&nand_chip)->writesize;
++	return CONFIG_SYS_NAND_PAGE_SIZE;
+ }
+ 
+ /* Unselect after operation */

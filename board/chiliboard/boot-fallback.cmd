@@ -1,9 +1,9 @@
 # U-Boot script for chiliBoard. Load this boot.scr from the SD boot partition.
-# MLO and U-Boot remain on SD; kernel and DTB are fetched from TFTP.
+# Try TFTP/NFS, then SD slot A, then NAND recovery.
 
 if test -z "${disable_tftp}"; then setenv disable_tftp 0; fi
 if test -z "${disable_sd}"; then setenv disable_sd 0; fi
-if test -z "${disable_nand}"; then setenv disable_nand 1; fi
+if test -z "${disable_nand}"; then setenv disable_nand 0; fi
 if test -z "${fallback_delay}"; then setenv fallback_delay 2; fi
 if test -z "${nfsroot}"; then setenv nfsroot /srv/zegos/rootfs; fi
 # The board's old U-Boot default is ttyO0; Linux 6.12 names this UART ttyS0.
@@ -46,7 +46,7 @@ if test "${disable_sd}" = "1"; then
 else
     echo "[BOOT] Waiting ${fallback_delay}s before SD"
     sleep ${fallback_delay}
-    echo "[BOOT] Trying SD (mmc 0)"
+    echo "[BOOT] Trying SD slot A"
     if mmc dev 0 && mmc rescan; then
         if fatload mmc 0:1 ${loadaddr} zImage; then
             if fatload mmc 0:1 ${fdt_addr} ${fdt_file}; then
@@ -57,7 +57,7 @@ else
             fi
         fi
     fi
-    echo "[BOOT] SD failed"
+    echo "[BOOT] SD slot A failed"
 fi
 
 if test "${disable_nand}" = "1"; then
@@ -65,16 +65,17 @@ if test "${disable_nand}" = "1"; then
 else
     echo "[BOOT] Waiting ${fallback_delay}s before NAND"
     sleep ${fallback_delay}
-    echo "[BOOT] Trying NAND"
-    if run nandargs; then
+    echo "[BOOT] Trying NAND recovery"
+    setenv console ttyS0,${baudrate}
+    if mtdparts default && run nandargs; then
         if nand read ${fdt_addr} NAND.u-boot-spl-os; then
             if nand read ${loadaddr} NAND.kernel; then
-                echo "[BOOT] Booting NAND kernel with UBI root"
+                echo "[BOOT] Booting NAND recovery kernel with UBI root"
                 bootz ${loadaddr} - ${fdt_addr}
             fi
         fi
     fi
-    echo "[BOOT] NAND failed"
+    echo "[BOOT] NAND recovery failed"
 fi
 
 echo "[BOOT] All enabled boot sources failed; entering U-Boot prompt"

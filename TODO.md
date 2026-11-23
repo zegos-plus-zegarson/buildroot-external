@@ -8,10 +8,12 @@ TODO:
     - [ ] Tftp setup directly through connection laptop <-> devboard
         - [ ] Ensure that it does not break networking
 - [ ] Add touchscreen support
-- [ ] Move uboot to nand (can be in both nand and sd card image) but set boot option to nand as uboot already handles boot fallbacks
-- [ ] Separate image gen for sdcard based boot and nand based
-- [ ] Update script to auto include boot-fallback scr to the board
-    - [ ] Automate initial setenv setup through dev setting in zig launcher and setenv on rust daemon side
+- [x] Boot NAND recovery through to login with the installer SD card removed
+- [ ] Confirm repeated NAND-only cold boots stay free of UBI/ECC errors
+- [ ] Verify NAND bad-block handling on hardware
+- [x] Add separate SD and NAND image targets
+- [x] Include generated boot.scr in the SD image
+- [ ] Configure the initial U-Boot environment through a Zig launcher setting and the Rust daemon
 - [ ] Add zig based launcher
     - [ ] Support for nested apps like mpv, quake
 - [ ] Add dbus daemons

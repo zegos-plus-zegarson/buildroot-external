@@ -1,0 +1,64 @@
+Subject: [PATCH] ARM: dts: am335x-chilisom: describe 256 MiB NAND recovery layout
+
+Match the chiliBoard U-Boot MTD partition map. Linux calls the NAND device
+omap2-nand.0 while U-Boot calls it 8000000.nand, so passing U-Boot's
+mtdparts string does not create the named UBI partition in Linux.
+
+---
+--- a/arch/arm/boot/dts/ti/omap/am335x-chilisom.dtsi
++++ b/arch/arm/boot/dts/ti/omap/am335x-chilisom.dtsi
+@@ -171,5 +171,52 @@
+ 		gpmc,clk-activation-ns = <0>;
+ 		gpmc,wr-access-ns = <40>;
+ 		gpmc,wr-data-mux-bus-ns = <0>;
+-	};
+-};
++
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition@0 {
++				label = "NAND.SPL";
++				reg = <0x0000000 0x0020000>;
++			};
++			partition@20000 {
++				label = "NAND.SPL.backup1";
++				reg = <0x0020000 0x0020000>;
++			};
++			partition@40000 {
++				label = "NAND.SPL.backup2";
++				reg = <0x0040000 0x0020000>;
++			};
++			partition@60000 {
++				label = "NAND.SPL.backup3";
++				reg = <0x0060000 0x0020000>;
++			};
++			partition@80000 {
++				label = "NAND.u-boot-spl-os";
++				reg = <0x0080000 0x0040000>;
++			};
++			partition@c0000 {
++				label = "NAND.u-boot";
++				reg = <0x00c0000 0x0100000>;
++			};
++			partition@1c0000 {
++				label = "NAND.u-boot-env";
++				reg = <0x01c0000 0x0020000>;
++			};
++			partition@1e0000 {
++				label = "NAND.u-boot-env.backup1";
++				reg = <0x01e0000 0x0020000>;
++			};
++			partition@200000 {
++				label = "NAND.kernel";
++				reg = <0x0200000 0x0800000>;
++			};
++			partition@a00000 {
++				label = "NAND.file-system";
++				reg = <0x0a00000 0x0f600000>;
++			};
++		};
++	};
++};
