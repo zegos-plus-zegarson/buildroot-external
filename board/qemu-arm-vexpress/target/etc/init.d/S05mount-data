@@ -1,0 +1,10 @@
+#!/bin/sh
+case "$1" in
+    start)
+        mkdir -p /data
+        mount -t ext4 /dev/mmcblk0p5 /data || exit 1
+        ;;
+    stop)
+        umount /data
+        ;;
+esac

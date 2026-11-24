@@ -1,3 +1,5 @@
 *.psk
 *.dtb
 *.preprocessed
+.qemu-arm-virt/
+.qemu-arm-vexpress/

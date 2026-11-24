@@ -9,6 +9,38 @@ Tested board: AM3352, 256 MiB RAM, 256 MiB NAND.
 | U-Boot | 2024.10 |
 | Toolchain | Bootlin ARMv7 hard-float glibc stable (x86_64 host) |
 
+## QEMU ARM Vexpress: SD A/B and recovery
+
+`zegos_qemu_arm_vexpress_defconfig` runs U-Boot and Linux on QEMU's
+`vexpress-a9` machine. It mirrors the current chiliBoard SD layout: U-Boot
+boots rootfs A, rootfs B is an initial copy, and a separate recovery rootfs
+is tried if A cannot be loaded. The emulator uses one SD disk.
+
+```sh
+docker compose run --rm ubuntu-buildroot make O=output-qemu-arm-vexpress zegos_qemu_arm_vexpress_defconfig
+docker compose run --rm ubuntu-buildroot sh -c 'make O=output-qemu-arm-vexpress -j"$(nproc)"'
+./scripts/run-qemu-arm-vexpress.sh
+```
+
+The launcher reads `output-qemu-arm-vexpress/images` and keeps a writable
+copy of `disk.img` under `.qemu-arm-vexpress/`. Pass another images directory
+as its first argument, or set `QEMU_STATE_DIR` for another writable disk
+location. Set `QEMU_RESET_DISK=1` for one launch to copy the freshly built
+disk again. Press Ctrl-A, X to exit QEMU. The login prompt uses `ttyAMA0`.
+
+| Partition | Size | Purpose |
+| --- | ---: | --- |
+| `/dev/mmcblk0p1` | 16 MiB | FAT boot script, kernel, DTB |
+| `/dev/mmcblk0p2` | 256 MiB | Rootfs A, current boot target |
+| `/dev/mmcblk0p3` | 256 MiB | Rootfs B, initial copy of A |
+| `/dev/mmcblk0p4` | 256 MiB | Recovery rootfs with its own kernel and DTB |
+| `/dev/mmcblk0p5` | 128 MiB | Shared test data, mounted at `/data` |
+
+The boot script tries A and then recovery. U-Boot also tries recovery if
+`boot.scr` is unavailable. A kernel that starts and later fails cannot be
+detected by this U-Boot script. Slot switching can be added after the basic
+image is validated.
+
 ## SD card (4 GB)
 
 ### Build

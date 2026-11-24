@@ -1,0 +1,8 @@
+CONFIG_BOOTCOMMAND="if fatload mmc 0:1 0x63000000 boot.scr; then source 0x63000000; else if ext4load mmc 0:4 0x64000000 /boot/zImage && ext4load mmc 0:4 0x62000000 /boot/vexpress-v2p-ca9.dtb; then setenv bootargs console=ttyAMA0,115200 root=/dev/mmcblk0p4 rootwait rw; bootz 0x64000000 - 0x62000000; fi; fi"
+CONFIG_BAUDRATE=115200
+CONFIG_CMD_MMC=y
+CONFIG_CMD_EXT4=y
+CONFIG_CMD_FAT=y
+CONFIG_CMD_BOOTZ=y
+# CONFIG_ENV_IS_IN_FLASH is not set
+CONFIG_ENV_IS_NOWHERE=y

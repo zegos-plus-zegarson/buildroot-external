@@ -2,7 +2,7 @@ TODO:
 - [ ] RAUC OTA
 - [ ] Separate readonly squashfs os base from writable user data
 - [ ] Games
-- [ ] QEMU virtual arm board for user space testing
+- [x] QEMU virtual arm board for user space testing
 - [ ] Better automation
     - [ ] Less flaky tftp/nfs setup that isn't dependent on router settings
     - [ ] Tftp setup directly through connection laptop <-> devboard
@@ -28,3 +28,7 @@ TODO:
     - [ ] Clock
     - [ ] Weather
     - [ ] Steps
+- [ ] Test if BR2_PER_PACKAGE_DIRECTORIES is stable enough
+- [ ] Implement chroot + bwrap writable layers
+    - [ ] Alpine
+    - [ ] Debian
